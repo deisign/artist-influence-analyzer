@@ -1,6 +1,6 @@
 import requests
 import streamlit as st
-from bs4 import BeautifulSoup
+import pandas as pd
 
 # Base URL for SecondHandSongs API
 BASE_URL = "https://secondhandsongs.com/search"
@@ -14,29 +14,43 @@ def search_artists(common_name, page=1, page_size=10):
         "pageSize": page_size,
     }
     headers = {"Accept": "application/json"}
-    st.text(f"Request URL: {url}")
-    st.text(f"Request Params: {params}")
     
     response = requests.get(url, params=params, headers=headers)
-    st.text(f"Response Status Code: {response.status_code}")
     
     if response.status_code != 200:
         st.error(f"Error {response.status_code}: {response.reason}")
-        st.text(response.text)
-        return {"error": f"Error {response.status_code}: {response.reason}"}
-    
-    if not response.content:
-        st.warning("The server returned an empty response.")
-        return {"error": "Empty response from server"}
+        return None
     
     try:
         return response.json()
     except ValueError:
         st.error("The response could not be parsed as JSON.")
-        st.text(response.text)  # Shows raw server response for debugging
-        soup = BeautifulSoup(response.text, "html.parser")
-        st.write("HTML Response (Parsed):", soup.prettify())
-        return {"error": "Invalid JSON response"}
+        st.text(response.text)  # Debug: Show raw response if JSON parsing fails
+        return None
+
+# Function to parse and display artist results
+def display_artist_results(data):
+    if "resultPage" not in data or not data["resultPage"]:
+        st.warning("No results found.")
+        return
+
+    # Extract relevant fields into a DataFrame
+    results = [
+        {
+            "Name": item["commonName"],
+            "Type": item["entitySubType"],
+            "Profile Link": item["uri"],
+        }
+        for item in data["resultPage"]
+    ]
+    df = pd.DataFrame(results)
+    
+    # Display as a table
+    st.write("### Results")
+    st.dataframe(df)
+    st.markdown("### Links")
+    for _, row in df.iterrows():
+        st.markdown(f"- [{row['Name']}]({row['Profile Link']})")
 
 # Streamlit application
 st.title("SecondHandSongs API Explorer")
@@ -54,9 +68,9 @@ if search_type == "Artist":
     if st.button("Search Artists"):
         if common_name:
             results = search_artists(common_name, page, page_size)
-            if "error" in results:
-                st.error(results["error"])
+            if results:
+                display_artist_results(results)
             else:
-                st.write("Results:", results)
+                st.error("No data returned from API.")
         else:
             st.warning("Please enter an artist's name.")
