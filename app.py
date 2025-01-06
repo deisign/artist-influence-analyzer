@@ -1,96 +1,110 @@
 import requests
-import pandas as pd
-import networkx as nx
-import matplotlib.pyplot as plt
-from collections import Counter
 import streamlit as st
 
-# Base URL for the API
-BASE_URL = 'https://api.secondhandsongs.com/v1'
+# Base URL for SecondHandSongs API
+BASE_URL = "https://secondhandsongs.com/search"
 
-# Function to fetch artist data
-def get_artist(artist_id):
-    response = requests.get(f"{BASE_URL}/artist/{artist_id}")
+# Function to search for artists
+def search_artists(common_name, page=1, page_size=10):
+    url = f"{BASE_URL}/artist"
+    params = {
+        "commonName": common_name,
+        "page": page,
+        "pageSize": page_size,
+    }
+    response = requests.get(url, params=params)
     if response.status_code == 200:
         return response.json()
     else:
-        st.error(f"Failed to fetch artist data: {response.status_code}")
-        return None
+        return {"error": f"Error {response.status_code}: {response.reason}"}
 
-# Function to fetch covers data
-def get_covers(artist_id):
-    response = requests.get(f"{BASE_URL}/artist/{artist_id}/covers")
+# Function to search for performances
+def search_performances(title, performer=None, date=None, page=1, page_size=10):
+    url = f"{BASE_URL}/performance"
+    params = {
+        "title": title,
+        "performer": performer,
+        "date": date,
+        "page": page,
+        "pageSize": page_size,
+    }
+    response = requests.get(url, params=params)
     if response.status_code == 200:
         return response.json()
     else:
-        st.error(f"Failed to fetch covers data: {response.status_code}")
-        return None
+        return {"error": f"Error {response.status_code}: {response.reason}"}
 
-# Function to process covers data
-def process_covers(data):
-    artists = [cover['original_artist']['name'] for cover in data['data']]
-    genres = [cover.get('genre', 'Unknown') for cover in data['data']]
-    years = [cover['release_date'][:4] for cover in data['data'] if 'release_date' in cover]
+# Function to search for works
+def search_works(title, credits=None, page=1, page_size=10):
+    url = f"{BASE_URL}/work"
+    params = {
+        "title": title,
+        "credits": credits,
+        "page": page,
+        "pageSize": page_size,
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {"error": f"Error {response.status_code}: {response.reason}"}
 
-    artist_influence = Counter(artists)
-    genre_distribution = Counter(genres)
-    year_distribution = Counter(years)
-    
-    return artist_influence, genre_distribution, year_distribution
+# Streamlit application
+st.title("SecondHandSongs API Explorer")
 
-# Function to draw influence graph
-def draw_influence_graph(artist_influence):
-    G = nx.DiGraph()
-    for artist, count in artist_influence.items():
-        G.add_edge(artist, 'Target Artist', weight=count)
+# Sidebar for search type
+search_type = st.sidebar.selectbox("Search Type", ["Artist", "Performance", "Work"])
 
-    pos = nx.spring_layout(G)
-    weights = [G[u][v]['weight'] for u, v in G.edges()]
-    plt.figure(figsize=(10, 8))
-    nx.draw(G, pos, with_labels=True, node_size=3000, node_color='lightblue', width=weights, font_size=10)
-    plt.title("Artist Influence Graph", fontsize=14)
-    st.pyplot(plt)
+# Artist search
+if search_type == "Artist":
+    st.header("Search for Artists")
+    common_name = st.text_input("Enter artist's name:")
+    page = st.number_input("Page", min_value=1, value=1)
+    page_size = st.number_input("Results per page", min_value=1, max_value=100, value=10)
 
-# Streamlit app
-st.title("Artist Influence Analyzer")
-st.sidebar.header("Input Parameters")
+    if st.button("Search Artists"):
+        if common_name:
+            results = search_artists(common_name, page, page_size)
+            if "error" in results:
+                st.error(results["error"])
+            else:
+                st.write(results)
+        else:
+            st.warning("Please enter an artist's name.")
 
-# Input: Artist ID
-artist_id = st.sidebar.text_input("Enter Artist ID", "11578")
+# Performance search
+if search_type == "Performance":
+    st.header("Search for Performances")
+    title = st.text_input("Enter performance title:")
+    performer = st.text_input("Enter performer name (optional):")
+    date = st.text_input("Enter date (optional, format YYYY-MM-DD):")
+    page = st.number_input("Page", min_value=1, value=1)
+    page_size = st.number_input("Results per page", min_value=1, max_value=100, value=10)
 
-# Analyze Button
-if st.sidebar.button("Analyze"):
-    st.subheader("Artist Information")
-    
-    # Fetch artist data
-    artist_data = get_artist(artist_id)
-    if artist_data:
-        st.write(f"**Artist Name:** {artist_data['name']}")
-        st.write(f"**Type:** {artist_data.get('type', 'Unknown')}")
-    
-    # Fetch covers data
-    covers_data = get_covers(artist_id)
-    if covers_data:
-        st.write(f"**Total Covers Found:** {len(covers_data['data'])}")
-        
-        # Process covers data
-        artist_influence, genre_distribution, year_distribution = process_covers(covers_data)
+    if st.button("Search Performances"):
+        if title:
+            results = search_performances(title, performer, date, page, page_size)
+            if "error" in results:
+                st.error(results["error"])
+            else:
+                st.write(results)
+        else:
+            st.warning("Please enter a performance title.")
 
-        # Display top influential artists
-        st.subheader("Top Influential Artists")
-        top_artists = pd.DataFrame(artist_influence.items(), columns=["Artist", "Covers"]).sort_values(by="Covers", ascending=False)
-        st.dataframe(top_artists)
+# Work search
+if search_type == "Work":
+    st.header("Search for Works")
+    title = st.text_input("Enter work title:")
+    credits = st.text_input("Enter credits (optional):")
+    page = st.number_input("Page", min_value=1, value=1)
+    page_size = st.number_input("Results per page", min_value=1, max_value=100, value=10)
 
-        # Display genre distribution
-        st.subheader("Genre Distribution")
-        genre_chart = pd.DataFrame(genre_distribution.items(), columns=["Genre", "Count"]).set_index("Genre")
-        st.bar_chart(genre_chart)
-
-        # Display covers over time
-        st.subheader("Covers Over Time")
-        year_chart = pd.DataFrame(year_distribution.items(), columns=["Year", "Count"]).set_index("Year").sort_index()
-        st.line_chart(year_chart)
-
-        # Draw influence graph
-        st.subheader("Influence Graph")
-        draw_influence_graph(artist_influence)
+    if st.button("Search Works"):
+        if title:
+            results = search_works(title, credits, page, page_size)
+            if "error" in results:
+                st.error(results["error"])
+            else:
+                st.write(results)
+        else:
+            st.warning("Please enter a work title.")
