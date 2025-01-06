@@ -4,3 +4,4 @@ pandas
 matplotlib
 networkx
 python-dotenv
+beautifulsoup4
