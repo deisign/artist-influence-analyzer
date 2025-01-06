@@ -27,15 +27,47 @@ def search_artists(common_name, page=1, page_size=10):
         st.text(response.text)  # Debug: Show raw response if JSON parsing fails
         return None
 
-# Function to fetch covers for a specific artist
+# Function to fetch covers (primary method)
 def fetch_covers(artist_uri):
     url = f"{artist_uri}/covers"
     headers = {"Accept": "application/json"}
+    
+    st.text(f"Fetching covers from: {url}")
     response = requests.get(url, headers=headers)
     
+    if response.status_code == 500:
+        st.warning("The server encountered an internal error (500). Covers may not be available.")
+        return None
     if response.status_code != 200:
         st.error(f"Error fetching covers: {response.status_code}")
+        st.text(response.text)
         return None
+
+    try:
+        return response.json()
+    except ValueError:
+        st.error("The response could not be parsed as JSON.")
+        st.text(response.text)
+        return None
+
+# Function to fetch performances (alternative for covers)
+def search_performances(performer, page=1, page_size=10):
+    url = f"{BASE_URL}/performance"
+    params = {
+        "performer": performer,
+        "page": page,
+        "pageSize": page_size,
+    }
+    headers = {"Accept": "application/json"}
+    
+    response = requests.get(url, params=params, headers=headers)
+    st.text(f"Fetching performances from: {response.url}")
+    
+    if response.status_code != 200:
+        st.error(f"Error fetching performances: {response.status_code}")
+        st.text(response.text)
+        return None
+
     try:
         return response.json()
     except ValueError:
@@ -70,13 +102,18 @@ def display_artist_results(data):
         st.markdown(f"- [{row['Name']}]({row['Profile Link']})")
 
     # Select artist for covers
-    selected_artist = st.selectbox("Select an artist to view covers", df["Name"])
+    selected_artist = st.selectbox("Select an artist to view covers or performances", df["Name"])
     artist_uri = df[df["Name"] == selected_artist]["Profile Link"].values[0]
     
     if artist_uri:
         covers_data = fetch_covers(artist_uri)
         if covers_data:
             display_covers(covers_data)
+        else:
+            st.warning("No covers found. Attempting to fetch performances.")
+            performances_data = search_performances(selected_artist)
+            if performances_data:
+                display_performances(performances_data)
 
 # Function to display covers
 def display_covers(data):
@@ -109,6 +146,24 @@ def display_covers(data):
         plt.ylabel("Number of Covers")
         plt.title("Covers Over Time")
         st.pyplot(plt)
+
+# Function to display performances (alternative for covers)
+def display_performances(data):
+    if "resultPage" not in data or not data["resultPage"]:
+        st.warning("No performances found for this artist.")
+        return
+    
+    st.write("### Performances")
+    performances = [
+        {
+            "Title": item["commonName"],
+            "Performer": item.get("performer", {}).get("commonName", "Unknown"),
+            "Year": item.get("date", "Unknown"),
+        }
+        for item in data["resultPage"]
+    ]
+    df_performances = pd.DataFrame(performances)
+    st.dataframe(df_performances)
 
 # Streamlit application
 st.title("SecondHandSongs API Explorer")
