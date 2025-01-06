@@ -12,11 +12,25 @@ def search_artists(common_name, page=1, page_size=10):
         "page": page,
         "pageSize": page_size,
     }
+    st.text(f"Request URL: {url}")
+    st.text(f"Request Params: {params}")
+    
     response = requests.get(url, params=params)
-    if response.status_code == 200:
-        return response.json()
-    else:
+    if response.status_code != 200:
+        st.error(f"Error {response.status_code}: {response.reason}")
+        st.text(response.text)
         return {"error": f"Error {response.status_code}: {response.reason}"}
+    
+    if not response.content:
+        st.warning("The server returned an empty response.")
+        return {"error": "Empty response from server"}
+    
+    try:
+        return response.json()
+    except ValueError:
+        st.error("The response could not be parsed as JSON.")
+        st.text(response.text)
+        return {"error": "Invalid JSON response"}
 
 # Function to search for performances
 def search_performances(title, performer=None, date=None, page=1, page_size=10):
@@ -28,11 +42,25 @@ def search_performances(title, performer=None, date=None, page=1, page_size=10):
         "page": page,
         "pageSize": page_size,
     }
+    st.text(f"Request URL: {url}")
+    st.text(f"Request Params: {params}")
+    
     response = requests.get(url, params=params)
-    if response.status_code == 200:
-        return response.json()
-    else:
+    if response.status_code != 200:
+        st.error(f"Error {response.status_code}: {response.reason}")
+        st.text(response.text)
         return {"error": f"Error {response.status_code}: {response.reason}"}
+    
+    if not response.content:
+        st.warning("The server returned an empty response.")
+        return {"error": "Empty response from server"}
+    
+    try:
+        return response.json()
+    except ValueError:
+        st.error("The response could not be parsed as JSON.")
+        st.text(response.text)
+        return {"error": "Invalid JSON response"}
 
 # Function to search for works
 def search_works(title, credits=None, page=1, page_size=10):
@@ -43,11 +71,25 @@ def search_works(title, credits=None, page=1, page_size=10):
         "page": page,
         "pageSize": page_size,
     }
+    st.text(f"Request URL: {url}")
+    st.text(f"Request Params: {params}")
+    
     response = requests.get(url, params=params)
-    if response.status_code == 200:
-        return response.json()
-    else:
+    if response.status_code != 200:
+        st.error(f"Error {response.status_code}: {response.reason}")
+        st.text(response.text)
         return {"error": f"Error {response.status_code}: {response.reason}"}
+    
+    if not response.content:
+        st.warning("The server returned an empty response.")
+        return {"error": "Empty response from server"}
+    
+    try:
+        return response.json()
+    except ValueError:
+        st.error("The response could not be parsed as JSON.")
+        st.text(response.text)
+        return {"error": "Invalid JSON response"}
 
 # Streamlit application
 st.title("SecondHandSongs API Explorer")
